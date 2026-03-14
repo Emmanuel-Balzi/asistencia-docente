@@ -167,67 +167,92 @@ function go(screen){
   if(screen==='cursos')
 function renderResumen(){
   const c=DB[ci],el=document.getElementById('tab-resumen');
-  if(!c.alumnos.length){el.innerHTML='<div class="empty">Sin alumnos a\u00fan.</div>';return;}
+  if(!c.alumnos.length){
+    el.innerHTML='<div class="empty">Sin alumnos en este curso.</div>';
+    return;
+  }
   const todasValidas=c.clases.filter(cl=>claseValida(cl));
-  el.innerHTML=c.alumnos.map((a,ai)=>{
-    const pres=todasValidas.filter(cl=>(cl.asistencia||{})[a.id]==='P').length;
+  let html='';
+  c.alumnos.forEach(function(a,ai){
+    const pres=todasValidas.filter(function(cl){return (cl.asistencia||{})[a.id]==='P';}).length;
     const totalCl=todasValidas.length;
     const pct=totalCl>0?Math.round((pres/totalCl)*100):null;
     const pctOk=pct!==null&&pct>=75;
     const examenes=c.examenes||[];
-    const notasAlumno=examenes.map(ex=>{
-      const nota=(ex.notas||{})[a.id];
-      return{nombre:ex.nombre,fecha:ex.fecha||'',nota:nota!==undefined&&nota!==''?parseFloat(nota):null};
-    }).filter(e=>e.nota!==null);
-    const promedio=notasAlumno.length>0?notasAlumno.reduce((s,e)=>s+e.nota,0)/notasAlumno.length:null;
+    const notasValidas=examenes.filter(function(ex){
+      const n=(ex.notas||{})[a.id];
+      return n!==undefined&&n!==''&&!isNaN(parseFloat(n));
+    });
+    const promedio=notasValidas.length>0
+      ?notasValidas.reduce(function(s,ex){return s+parseFloat((ex.notas||{})[a.id]);},0)/notasValidas.length
+      :null;
     const promOk=promedio!==null&&promedio>=NOTA_APROBADO;
-    const detalleExamenes=examenes.length
-      ?'<div style="font-size:12px;font-weight:600;color:var(--txt2);margin-bottom:8px">Detalle por examen</div>'
-       +examenes.map(ex=>{
-          const nota=(ex.notas||{})[a.id];
-          const n=nota!==undefined&&nota!==''?parseFloat(nota):null;
-          const b=notaBadge(n);
-          return'<div class="ex-row"><div><div style="font-size:14px">'+ex.nombre+'</div>'
-            +(ex.fecha?'<div style="font-size:11px;color:var(--txt2)">'+ex.fecha+'</div>':'')
-            +'</div><span class="nota-b '+b.cls+'">'+b.txt+'</span></div>';
-        }).join('')
-      :'<div style="font-size:13px;color:var(--txt2)">Sin ex\u00e1menes cargados.</div>';
-    return '<div class="alumno-card">'
+
+    const asistColor=pct===null?'var(--txt2)':pctOk?'var(--suc)':'var(--dan)';
+    const promColor=promedio===null?'var(--txt2)':promOk?'var(--suc)':'var(--dan)';
+
+    let detalleEx='';
+    if(examenes.length){
+      detalleEx+='<div style="font-size:12px;font-weight:600;color:var(--txt2);margin-bottom:8px;margin-top:4px">Detalle por examen</div>';
+      examenes.forEach(function(ex){
+        const nota=(ex.notas||{})[a.id];
+        const n=nota!==undefined&&nota!==''?parseFloat(nota):null;
+        const b=notaBadge(n);
+        detalleEx+='<div class="ex-row">'
+          +'<div><div style="font-size:14px">'+ex.nombre+'</div>'
+          +(ex.fecha?'<div style="font-size:11px;color:var(--txt2)">'+ex.fecha+'</div>':'')
+          +'</div>'
+          +'<span class="nota-b '+b.cls+'">'+b.txt+'</span>'
+          +'</div>';
+      });
+    } else {
+      detalleEx='<div style="font-size:13px;color:var(--txt2)">Sin examenes cargados.</div>';
+    }
+
+    html+='<div class="alumno-card">'
       +'<div class="alumno-card-hdr" data-ai="'+ai+'">'
         +'<div class="av">'+ini(a.nombre,a.apellido)+'</div>'
         +'<div style="flex:1">'
           +'<div style="font-weight:600;font-size:15px">'+a.apellido+', '+a.nombre+'</div>'
           +'<div style="font-size:12px;margin-top:2px;display:flex;gap:10px">'
-            +(pct!==null?'<span style="color:'+(pctOk?'var(--suc)':'var(--dan)')+'">Asist. '+pct+'%</span>':'<span style="color:var(--txt2)">Sin clases</span>')
-            +(promedio!==null?'<span style="color:'+(promOk?'var(--suc)':'var(--dan)')+'">Prom. '+promedio.toFixed(1)+'</span>':'<span style="color:var(--txt2)">Sin notas</span>')
+            +(pct!==null
+              ?'<span style="color:'+asistColor+'">Asist. '+pct+'%</span>'
+              :'<span style="color:var(--txt2)">Sin clases</span>')
+            +(promedio!==null
+              ?'<span style="color:'+promColor+'">Prom. '+promedio.toFixed(1)+'</span>'
+              :'<span style="color:var(--txt2)">Sin notas</span>')
           +'</div>'
         +'</div>'
-        +'<span style="color:var(--txt2);font-size:18px" id="rarr-'+ai+'">&#9662;</span>'
+        +'<span style="color:var(--txt2);font-size:16px" id="rarr-'+ai+'">+</span>'
       +'</div>'
       +'<div class="alumno-card-body" id="abody-'+ai+'">'
         +'<div class="resumen-grid">'
           +'<div class="resumen-metric">'
             +'<div class="resumen-metric-label">Asistencia</div>'
-            +'<div class="resumen-metric-value" style="color:'+(pct===null?'var(--txt2)':pctOk?'var(--suc)':'var(--dan)')+'">'+( pct!==null?pct+'%':'&mdash;')+'</div>'
+            +'<div class="resumen-metric-value" style="color:'+asistColor+'">'+(pct!==null?pct+'%':'--')+'</div>'
             +(totalCl>0?'<div style="font-size:11px;color:var(--txt2);margin-top:3px">'+pres+' de '+totalCl+' clases</div>':'')
           +'</div>'
           +'<div class="resumen-metric">'
-            +'<div class="resumen-metric-label">Promedio ex\u00e1menes</div>'
-            +'<div class="resumen-metric-value" style="color:'+(promedio===null?'var(--txt2)':promOk?'var(--suc)':'var(--dan)')+'">'+( promedio!==null?promedio.toFixed(1):'&mdash;')+'</div>'
-            +(notasAlumno.length>0?'<div style="font-size:11px;color:var(--txt2);margin-top:3px">'+notasAlumno.length+' examen(es)</div>':'')
+            +'<div class="resumen-metric-label">Promedio</div>'
+            +'<div class="resumen-metric-value" style="color:'+promColor+'">'+(promedio!==null?promedio.toFixed(1):'--')+'</div>'
+            +(notasValidas.length>0?'<div style="font-size:11px;color:var(--txt2);margin-top:3px">'+notasValidas.length+' examen(es)</div>':'')
           +'</div>'
         +'</div>'
-        +detalleExamenes
+        +detalleEx
       +'</div>'
     +'</div>';
-  }).join('');
-  document.querySelectorAll('.alumno-card-hdr').forEach(hdr=>hdr.addEventListener('click',function(){
-    const ai=parseInt(this.getAttribute('data-ai'));
-    const body=document.getElementById('abody-'+ai),arr=document.getElementById('rarr-'+ai);
-    const open=body.style.display==='block';
-    body.style.display=open?'none':'block';
-    arr.textContent=open?'\u25be':'\u25b4';
-  }));
+  });
+  el.innerHTML=html;
+  document.querySelectorAll('.alumno-card-hdr').forEach(function(hdr){
+    hdr.addEventListener('click',function(){
+      const ai=parseInt(this.getAttribute('data-ai'));
+      const body=document.getElementById('abody-'+ai);
+      const arr=document.getElementById('rarr-'+ai);
+      const open=body.style.display==='block';
+      body.style.display=open?'none':'block';
+      arr.textContent=open?'+':'-';
+    });
+  });
 }
 
 renderCursos();
